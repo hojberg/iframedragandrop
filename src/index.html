@@ -1,0 +1,141 @@
+<!doctype html>
+
+<html>
+  <head lang="en">
+    <meta charset="UTF-8">
+    <title>Testing iframe drag and drop</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+      }
+
+      .side-by-side {
+        display: flex;
+        flex-direction: row;
+        gap: 2rem;
+      }
+
+      iframe {
+        border: 2px solid #000;
+        width: 300px;
+        height: 300px;
+      }
+
+      #from {
+        background: orange;
+      }
+
+      #to {
+        background: lightblue;
+      }
+
+      #faux-drag-item {
+        position: absolute;
+        display: none;
+      }
+
+      .item {
+        background: yellow;
+        padding: 0.25rem;
+        cursor: move;
+        opacity: 0.5;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Iframe drag and drop</h1>
+    <div class="side-by-side">
+      <iframe id="from" src="/drag.html"></iframe>
+      <iframe id="to" src="/drop.html"></iframe>
+      <div id="faux-drag-item" class="item"></div>
+    </div>
+    <script>
+      const dragFrame = document.querySelector("#from");
+      const dropFrame = document.querySelector("#to");
+      const dropFrameHeight = parseInt(getComputedStyle(dropFrame).height);
+      const dropFrameWidth = parseInt(getComputedStyle(dropFrame).width);
+      let dragItem = null; 
+
+      function getTopLeft(el) {
+        const top = parseInt(getComputedStyle(el).top);
+        const left = parseInt(getComputedStyle(el).left);
+        return { top, left };
+      }
+
+      function getOffset(el) {
+        const top = el.offsetTop;
+        const left = el.offsetLeft;
+        return { top, left };
+      }
+
+      function setTopLeft(el, offset) {
+        el.style.top = offset.top + "px";
+        el.style.left = offset.left + "px";
+      }
+
+      function hide(el) {
+        el.style.display = "none";
+      }
+
+      function show(el) {
+        el.style.display = "block";
+      }
+
+      window.addEventListener("message", (message) => {
+        const { action, offset } = message.data;
+
+        if (action == 'dragStart') {
+          dragItem = document.querySelector("#faux-drag-item");
+          dragItem.innerText = message.data.itemText;
+          show(dragItem);
+          setTopLeft(dragItem, offset);
+          dragItemId = message.data.itemId;
+          dragItemText = message.data.itemText;
+
+          dropFrame.contentWindow.postMessage(message.data, '*');
+        }
+        else if (action == 'dragMove') {
+          let offsetTop = offset.top;
+          let offsetLeft = offset.left;
+
+          if (message.data.frame == "to") {
+            offsetTop = offsetTop + dropFrame.offsetTop;
+            offsetLeft = offsetLeft + dropFrame.offsetLeft;
+          }
+
+          if (dragItem) {
+            setTopLeft(dragItem, { top: offsetTop, left: offsetLeft});
+          }
+        }
+        else if (dragItem && action == 'dragCancel') {
+          const dropWin = dropFrame.contentWindow;
+          const dragWin = dragFrame.contentWindow;
+          const dropFrameOffset = getOffset(dropFrame);
+          const clientY = parseInt(getComputedStyle(dragItem).top);
+          const clientX = parseInt(getComputedStyle(dragItem).left);
+
+          // If it is in the drop zone, notify the drop frame
+          if (dropFrameOffset.top < clientY && dropFrameOffset.top + dropFrameHeight > clientY &&
+              dropFrameOffset.left < clientX && dropFrameOffset.left  + dropFrameWidth > clientX) {
+
+            dropWin.postMessage({ action: 'dropItem', itemId: dragItemId, itemText: dragItemText }, '*');
+            hide(dragItem);
+            dragItem = null;
+          }
+              else {
+            dragWin.postMessage({ action: 'dragCancel', itemId: dragItemId, itemText: dragItemText }, '*');
+            dropWin.postMessage({ action: 'dragCancel', itemId: dragItemId}, '*');
+            hide(dragItem);
+            dragItem = null;
+          }
+
+        }
+        else if (action == "itemDropped") {
+          dragFrame.contentWindow.postMessage({
+            action: 'itemDropped', itemId: dragItemId
+          }, '*');
+        }
+      }, false);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+
+<html>
+  <head lang="en">
+    <meta charset="UTF-8">
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+      }
+
+      .items {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .item {
+        background: yellow;
+        padding: 0.25rem;
+        cursor: move;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Drag</h2>
+
+    <div class="items">
+      <div id="item-1" class="item">#1 drag me</div>
+      <div id="item-2" class="item">#2 drag me</div>
+      <div id="item-3" class="item">#3 drag me</div>
+    </div>
+    <script>
+      const items = document.querySelectorAll(".item");
+
+      let dragElement = null;
+      let dragStarted = false;
+
+      window.addEventListener('message', (message) => {
+        const { action } = message.data.action;
+        if (action === "itemDropped") {
+          document.querySelector("#" + message.data.itemId).remove();
+          dragStarted = false;
+          dragElement = null;
+        } else if (action === "dragCancel") {
+          dragStarted = false;
+          dragElement = null;
+        }
+      }, false);
+
+      function handleMouseDown(evt) {
+        dragElement = this;
+      }
+
+      items.forEach(d => d.addEventListener("mousedown", handleMouseDown, false));
+
+      document.addEventListener("mousemove", (evt) => {
+        if (dragElement) {
+          if (!dragStarted) {
+            parent.postMessage({
+              action: "dragStart", 
+              frame: "from",
+              itemText: dragElement.innerText, 
+              itemId: dragElement.getAttribute("id"),
+              offset: { left: evt.pageX, top: evt.pageY }
+            }, '*');
+
+            dragStarted = true;
+          } 
+          else {
+            parent.postMessage({
+              action: "dragMove", 
+              frame: "from",
+              offset: { left: evt.pageX, top: evt.pageY }
+            }, '*');
+          }
+        }
+      }, false);
+
+      document.addEventListener('mouseup', (evt) => {
+        if (dragStarted) {
+          parent.postMessage({
+            action: "dragCancel",
+            frame: "from",
+            itemText: dragElement.innerText,
+            itemId: dragElement.getAttribute("id"),
+            offset: { left: evt.pageX, top: evt.pageY }
+          }, '*');
+        }
+
+        dragStarted = false;
+        dragElement = null;
+      }, false);
+    </script>
+  </body>
+</html>
